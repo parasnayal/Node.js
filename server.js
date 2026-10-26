@@ -1,5 +1,7 @@
 import http from "http";
 
+import {getTasks , saveData} from './task-storage.js';
+
 const PORT = 3000;
 
 // const server = http.createServer((req,res)=>{
@@ -78,9 +80,127 @@ const TASKS = [
   },
 ];
 
-let nextTaskId = Math.max(0, ...TASKS.map(task => task.id)) + 1;
+const getTaskId =  (tasks) => {
+    let nextTaskId = Math.max(0, ...tasks.map(task => task.id)) + 1;
 
-const server = http.createServer((req,res)=>{
+    console.log(nextTaskId,'next')
+
+    return nextTaskId;
+}
+
+// const server = http.createServer((req,res)=>{
+//     const url = new URL (req.url, `http://${req.headers.host || "localhost"}`);
+
+//     if(req.method === "GET" && url.pathname === "/health"){
+//         res.writeHead(200,{"content-type":"application/json"});
+
+//         return res.end(JSON.stringify({status:"OK"}));
+//     }
+
+//     const taskRoute = url.pathname.match(/^\/tasks\/([^/]+)$/);
+
+//     if(req.method === "GET" && url.pathname === "/tasks"){
+//         res.writeHead(200,{"content-type":"application/json"});
+
+//        return res.end(JSON.stringify({status:"OK",data:TASKS}));
+//     }
+
+//     if(req.method === "GET" && taskRoute ){
+//         const taskId = taskRoute[1];
+
+//         if (!validateTaskId(taskId)) {
+//          res.writeHead(400,{"content-type":"application/json"});
+
+//         return res.end(JSON.stringify({status:"ERROR",message:"Invalid task ID"}));
+//         }
+
+//         const taskById = TASKS.find(taskItem => taskItem.id === parseInt(taskId));
+
+//         if(!taskById) {
+//             res.writeHead(404,{"content-type":"application/json"});
+
+//             return res.end(JSON.stringify({status:"ERROR",message:"Task not found"}))
+//         }
+
+//         res.writeHead(200,{"content-type":"application/json"});
+
+//         return res.end(JSON.stringify({status:"OK",data:taskById}));
+//     }
+
+//         if(req.method === "DELETE" && taskRoute ){
+//         const taskId = taskRoute[1];
+        
+//         if (!validateTaskId(taskId)) {
+//          res.writeHead(400,{"content-type":"application/json"});
+
+//         return res.end(JSON.stringify({status:"ERROR",message:"Invalid task ID"}))
+//         }
+
+//         const deletedTask = TASKS.findIndex(taskItem => taskItem.id === parseInt(taskId));
+
+//         if(deletedTask === -1){
+//             res.writeHead(404,{"content-type":"application/json"});
+
+//             return res.end(JSON.stringify({status:"ERROR",message:"Task not found"}))
+//         }
+
+//         TASKS.splice(deletedTask,1);
+
+//         res.writeHead(204);
+
+//         res.end();
+//     }
+
+//     if(req.method === "POST" && url.pathname === "/tasks"){
+//         let body = "";
+
+//         req.on("data",(chunk)=>{
+//             body += chunk.toString();
+            
+//         })
+
+//         req.on("end",()=>{
+//            try{
+//             const payload = JSON.parse(body);
+
+//             if (
+//             !payload ||
+//             typeof payload !== "object" ||
+//             Array.isArray(payload) ||
+//             typeof payload.title !== "string" ||
+//             !payload.title.trim()
+//             ) {
+//             res.writeHead(400, { 'Content-Type': 'application/json' });
+//             return res.end(JSON.stringify({ error: 'Invalid JSON payload format.' }));
+//             }
+
+//             const newTask = {
+//                 id: nextTaskId++,
+//                 title: payload.title.trim(),
+//                 completed: false,
+//             }
+
+//             TASKS.push(newTask);
+            
+//             res.writeHead(201,{"content-type":"application/json"});
+
+//             return res.end(JSON.stringify({status:"OK",data:newTask}));
+//            }catch(err){
+//             res.writeHead(400, { 'Content-Type': 'application/json' });
+//             return res.end(JSON.stringify({ error: 'Invalid JSON payload format.' }));
+//            }
+//         })   
+
+//         return;
+//     }
+
+//     res.writeHead(404,{"content-type":"application/json"});
+//     res.end(JSON.stringify({status: "ERROR", error: "Route not found" }));
+
+// })
+
+
+const server = http.createServer(async (req,res)=>{
     const url = new URL (req.url, `http://${req.headers.host || "localhost"}`);
 
     if(req.method === "GET" && url.pathname === "/health"){
@@ -92,9 +212,25 @@ const server = http.createServer((req,res)=>{
     const taskRoute = url.pathname.match(/^\/tasks\/([^/]+)$/);
 
     if(req.method === "GET" && url.pathname === "/tasks"){
-        res.writeHead(200,{"content-type":"application/json"});
+       
+        
+        try {
+            const data = await getTasks()
 
-       return res.end(JSON.stringify({status:"OK",data:TASKS}));
+        res.writeHead(200,{"content-type":"application/json"});
+        
+        return res.end(JSON.stringify({status:"OK",data:data}));
+        } catch (error) {
+             res.writeHead(500, {
+                "Content-Type": "application/json",
+            });
+
+            return res.end(JSON.stringify({
+            status: "ERROR",
+            message: "Unable to retrieve tasks",
+            }));
+        }
+       
     }
 
     if(req.method === "GET" && taskRoute ){
@@ -106,7 +242,10 @@ const server = http.createServer((req,res)=>{
         return res.end(JSON.stringify({status:"ERROR",message:"Invalid task ID"}));
         }
 
-        const taskById = TASKS.find(taskItem => taskItem.id === parseInt(taskId));
+        try {
+            const taskList = await getTasks();
+
+        const taskById = taskList.find(taskItem => taskItem.id === parseInt(taskId));
 
         if(!taskById) {
             res.writeHead(404,{"content-type":"application/json"});
@@ -117,6 +256,18 @@ const server = http.createServer((req,res)=>{
         res.writeHead(200,{"content-type":"application/json"});
 
         return res.end(JSON.stringify({status:"OK",data:taskById}));
+        } catch (error) {
+            res.writeHead(500, {
+                "Content-Type": "application/json",
+            });
+
+            return res.end(JSON.stringify({
+            status: "ERROR",
+            message: "Unable to retrieve tasks",
+            }));
+        }
+
+        
     }
 
         if(req.method === "DELETE" && taskRoute ){
@@ -128,7 +279,10 @@ const server = http.createServer((req,res)=>{
         return res.end(JSON.stringify({status:"ERROR",message:"Invalid task ID"}))
         }
 
-        const deletedTask = TASKS.findIndex(taskItem => taskItem.id === parseInt(taskId));
+        try {
+            const taskList = await getTasks();
+
+        const deletedTask = taskList.findIndex(taskItem => taskItem.id === parseInt(taskId));
 
         if(deletedTask === -1){
             res.writeHead(404,{"content-type":"application/json"});
@@ -136,11 +290,25 @@ const server = http.createServer((req,res)=>{
             return res.end(JSON.stringify({status:"ERROR",message:"Task not found"}))
         }
 
-        TASKS.splice(deletedTask,1);
+        taskList.splice(deletedTask,1);
+
+        await saveData(taskList);
 
         res.writeHead(204);
 
-        res.end();
+        return res.end();
+        } catch (error) {
+            res.writeHead(500, {
+                "Content-Type": "application/json",
+                });
+
+            return res.end(JSON.stringify({
+            status: "ERROR",
+            message: "Unable to retrieve tasks",
+            }));
+        }
+
+        
     }
 
     if(req.method === "POST" && url.pathname === "/tasks"){
@@ -151,9 +319,12 @@ const server = http.createServer((req,res)=>{
             
         })
 
-        req.on("end",()=>{
+
+        req.on("end",async ()=>{
            try{
             const payload = JSON.parse(body);
+
+            console.log(payload,'payload')
 
             if (
             !payload ||
@@ -166,17 +337,32 @@ const server = http.createServer((req,res)=>{
             return res.end(JSON.stringify({ error: 'Invalid JSON payload format.' }));
             }
 
+            try {
+                const existingTask = await getTasks();
+           
+            const taskId = getTaskId(existingTask);
+
             const newTask = {
-                id: nextTaskId++,
+                id: taskId,
                 title: payload.title.trim(),
                 completed: false,
             }
-
-            TASKS.push(newTask);
+            
+            await saveData([...existingTask , newTask]);
             
             res.writeHead(201,{"content-type":"application/json"});
 
             return res.end(JSON.stringify({status:"OK",data:newTask}));
+            } catch (error) {
+                res.writeHead(500, {
+                "Content-Type": "application/json",
+                });
+
+            return res.end(JSON.stringify({
+            status: "ERROR",
+            message: "Unable to retrieve tasks",
+            }));
+            }
            }catch(err){
             res.writeHead(400, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({ error: 'Invalid JSON payload format.' }));
